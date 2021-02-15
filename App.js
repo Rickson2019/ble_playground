@@ -4,10 +4,12 @@
  * @format
  * @flow strict-local
  */
+import { stringToBytes } from "convert-string";
 
 import React, {
   useState,
   useEffect,
+  Fragment,
 } from 'react';
 import {
   SafeAreaView,
@@ -23,6 +25,7 @@ import {
   PermissionsAndroid,
   FlatList,
   TouchableHighlight,
+  TextInput
 } from 'react-native';
 
 import {
@@ -41,9 +44,13 @@ const App = () => {
   const [list, setList] = useState([]);
 
 
+  const [text_to_send, setTextToSend] = useState('');
+
+
   const [peripheral_info, renderPeripheral] = useState();
 
   const [connected_peripheral, set_to_connected] = useState();
+
 
   const startScan = () => {
     if (!isScanning) {
@@ -68,7 +75,7 @@ const App = () => {
     if (peripheral) {
       peripheral.connected = false;
       peripherals.set(peripheral.id, peripheral);
-      set_to_connected(peripheral.id)
+
 
       setList(Array.from(peripherals.values()));
     }
@@ -87,8 +94,13 @@ const App = () => {
       console.log(results);
       for (var i = 0; i < results.length; i++) {
         var peripheral = results[i];
-        console.log('\n---------------------------------------------connected peripherals-------------------------------------------\n')
+
+        console.log('\n---------------------------------------------connected peripherals-------------------------------------------')
         console.log(`ID: ${peripheral.id}`)
+        set_to_connected(peripheral.id)
+        console.log(`${JSON.stringify(peripheral)}`)
+        console.log('\n---------------------------------------------connected peripherals-------------------------------------------')
+
         peripheral.connected = true;
         peripherals.set(peripheral.id, peripheral);
         setList(Array.from(peripherals.values()));
@@ -124,8 +136,9 @@ const App = () => {
             peripherals.set(peripheral.id, p);
             setList(Array.from(peripherals.values()));
           }
-          console.log('Connected to ' + peripheral.id);
 
+          console.log('Connected to ' + peripheral.id);
+          set_to_connected(peripheral.id)
 
           setTimeout(() => {
 
@@ -255,30 +268,104 @@ const App = () => {
           <Text style={{ fontSize: 12, textAlign: 'center', color: '#333333', padding: 10 }}>{item.name}</Text>
           <Text style={{ fontSize: 10, textAlign: 'center', color: '#333333', padding: 2 }}>RSSI: {item.rssi}</Text>
           <Text style={{ fontSize: 8, textAlign: 'center', color: '#333333', padding: 2, paddingBottom: 20 }}>{item.id}</Text>
-          {item.connected && <Button title='Press Me to See UUID info' onPress={() => {
+          {item.connected &&
+            <Fragment>
+              <Button title='Press Me to See UUID info' onPress={() => {
 
-            console.log('hey you touched me!')
-            console.log(connected_peripheral)
-            console.log(list)
+                console.log('hey you touched me!')
+                console.log(connected_peripheral)
+                console.log(list)
 
-            BleManager.getConnectedPeripherals([]).then((results) => {
-              if (results.length == 0) {
-                console.log('No connected peripherals')
+                BleManager.getConnectedPeripherals([]).then((results) => {
+                  if (results.length == 0) {
+                    console.log('No connected peripherals')
 
-                BleManager.retrieveServices(connected_peripheral).then((peripheralInfo) => {
-                  console.log('peripheralInfo', peripheralInfo.services);
+                    BleManager.retrieveServices(connected_peripheral).then((peripheralInfo) => {
+                      console.log('peripheralInfo', peripheralInfo.services);
+                    })
+                    // console.log()
+                  }
+                  console.log(results);
+                  for (var i = 0; i < results.length; i++) {
+                    var peripheral = results[i];
+                    peripheral.connected = true;
+                    peripherals.set(peripheral.id, peripheral);
+                    peripheral
+                    setList(Array.from(peripherals.values()));
+                  }
+                });
+              }}></Button>
+
+              <TextInput
+                style={[styles.textInput]}
+                value={text_to_send}
+                placeholder="input"
+                onChangeText={(text) => {
+                  setTextToSend(text)
+                }}
+              />
+
+              <Button title='send message' onPress={() => {
+
+                BleManager.connect(connected_peripheral).then((res) => {
+                  console.log('connected!!!!!!!!!!!!!!!!!!!!!!!')
+                  console.log('311 ------------  res')
+                  console.log(res)
+                  console.log('311 ------------  res')
+
+                  BleManager.retrieveServices(connected_peripheral).then((peripheralInfo) => {
+                    console.log('peripheralInfo', peripheralInfo.services);
+
+
+                    console.log('---------- text to send--------')
+                    console.log(`string: ${text_to_send}`);
+                    console.log(`string: ${stringToBytes(text_to_send)}`);
+                    console.log('---------- text to send --------')
+
+                    var service = '13333333-3333-3333-3333-333333333337';
+                    var bakeCharacteristic = '13333333-3333-3333-3333-333333330003';
+                    var crustCharacteristic = '13333333-3333-3333-3333-333333330001';
+
+                    console.log('---------- write---------------------')
+                    BleManager.startNotification(connected_peripheral, service, bakeCharacteristic).then(() => {
+                      setTimeout(() => {
+
+                        // stringToBytes(text_to_send)
+
+                        // BleManager.write(connected_peripheral, service, crustCharacteristic, [0])
+                        //   .then(() => {
+
+                        BleManager.write(connected_peripheral, service, bakeCharacteristic, stringToBytes(text_to_send)).then(() => {
+                          console.log(`msg sent ${stringToBytes(text_to_send)}`);
+                        })
+
+                        console.log('Sent?????')
+                        this.alert("message sent!");
+                        // })
+                        // .catch((err) => {
+                        //   console.log('failed to send')
+                        //   console.log(err)
+                        //   this.alert("failed to send");
+
+                        // });
+                      })
+                        .catch((err) => {
+                          console.log('failed to send')
+                          console.log(err)
+                          this.alert("failed to send");
+
+                        });
+                    }, 500);
+                  })
                 })
-                // console.log()
               }
-              console.log(results);
-              for (var i = 0; i < results.length; i++) {
-                var peripheral = results[i];
-                peripheral.connected = true;
-                peripherals.set(peripheral.id, peripheral);
-                setList(Array.from(peripherals.values()));
-              }
-            });
-          }}></Button>}
+              }></Button>
+              {/* Disconnect button */}
+              <Button title='Disconnect!' onPress={() => {
+                console.log('---------disconnecting---------------')
+                BleManager.disconnect(connected_peripheral);
+              }} />
+            </Fragment>}
         </View>
       </TouchableHighlight>
     );
@@ -317,7 +404,8 @@ const App = () => {
             {
               <View>
 
-                <Text>{peripheral_info}</Text>
+                <Text>{connected_peripheral && <Text>
+                  Connected!!!</Text>}</Text>
               </View>}
 
           </View>
